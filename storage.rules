@@ -1,0 +1,33 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Log attachments and incident assets
+    match /incidents/{incidentId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.resource.size < 50 * 1024 * 1024; // 50MB max
+    }
+    
+    // Postmortem exports and runbook PDFs
+    match /exports/{exportId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.resource.size < 20 * 1024 * 1024; // 20MB max
+    }
+
+    // User avatars
+    match /avatars/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId && request.resource.size < 5 * 1024 * 1024; // 5MB max
+    }
+
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

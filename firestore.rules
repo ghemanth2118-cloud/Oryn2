@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && (
+        getUserData().role == 'admin' || 
+        request.auth.token.role == 'admin'
+      );
+    }
+    
+    function isEngineerOrAdmin() {
+      return isAuthenticated() && (
+        getUserData().role in ['engineer', 'admin', 'sre'] || 
+        request.auth.token.role in ['engineer', 'admin', 'sre']
+      );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Incidents Collection
+    match /incidents/{incidentId} {
+      allow read: if isAuthenticated();
+      allow create: if isEngineerOrAdmin();
+      allow update: if isEngineerOrAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Memories Collection (Organizational Memory)
+    match /memories/{memoryId} {
+      allow read: if isAuthenticated();
+      allow create: if isEngineerOrAdmin();
+      allow update: if isEngineerOrAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Runbooks Collection
+    match /runbooks/{runbookId} {
+      allow read: if isAuthenticated();
+      allow create: if isEngineerOrAdmin();
+      allow update: if isEngineerOrAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Postmortems Collection
+    match /postmortems/{postmortemId} {
+      allow read: if isAuthenticated();
+      allow create: if isEngineerOrAdmin();
+      allow update: if isEngineerOrAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Deployments Collection
+    match /deployments/{deploymentId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isEngineerOrAdmin();
+    }
+
+    // Service Health Collection
+    match /serviceHealth/{serviceId} {
+      allow read: if isAuthenticated();
+      allow write: if isEngineerOrAdmin();
+    }
+
+    // Notifications Collection
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated();
+      allow write: if isEngineerOrAdmin();
+    }
+
+    // Default deny all other paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
